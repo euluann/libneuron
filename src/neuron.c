@@ -489,7 +489,7 @@ bool weights_mutate(ForwardMemory *forward_memory){
 	for (int i = 0; i < weights_length; i++){
 		// Gera um numeto aleatorio dentro de -max_weight a max_weight
 		weights[i] += (double)rand() / RAND_MAX * max_weight_mutation * 2 - max_weight_mutation;
-		weights[i] = min(max(weights[i], max_weight), -max_weight);
+		weights[i] = max(min(weights[i], max_weight), -max_weight);
 	}
 
 	return 0;
@@ -508,7 +508,7 @@ bool biases_mutate(ForwardMemory *forward_memory) {
 	for (int i = 0; i < biases_length; i++){
 		// Gera um numeto aleatorio dentro de -max_biases a max_biases
 		biases[i] += (double)rand() / RAND_MAX * max_bias_mutation * 2 - max_bias_mutation;
-		biases[i] = min(max(biases[i], max_bias), -max_bias);
+		biases[i] = max(min(biases[i], max_bias), -max_bias);
 	}
 
 	return 0;
