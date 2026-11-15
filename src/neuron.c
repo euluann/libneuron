@@ -10,6 +10,8 @@
 #include <stdbool.h>
 #include <string.h>
 #include <time.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 // Funcao de ativacao (AF) ReLU
 double ReLU(double value){
