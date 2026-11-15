@@ -13,7 +13,7 @@ A lightweight neural network library written in C, implementing forward propagat
 
 ## Compile your program
 ```bash
-gcc -I./include src/* main.c -o main
+gcc -lm -I./include src/* main.c -o main
 ```
 
 ## Usage
