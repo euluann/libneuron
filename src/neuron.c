@@ -10,6 +10,8 @@
 #include <stdbool.h>
 #include <string.h>
 #include <time.h>
+#include <math.h>
+
 
 // Funcao de ativacao (AF) ReLU
 double ReLU(double value){
@@ -18,6 +20,27 @@ double ReLU(double value){
 // Derivada da AF ReLU 
 double ReLU_derivative(double value){
 	return value > 0 ? 1 : 0;
+}
+// AF Softmax
+void softmax(double *input, size_t size){
+	// Soma de todos os expoentes
+	double exp_sum = 0;
+	// O maior valor da lista
+	double logits_max = 0;
+	// Obtem o maior valor
+	for (int i = 0; i < size; i++){
+		if (input[i] > logits_max){
+			logits_max = input[i];
+		}
+	}
+	// Obtem a soma de todos os expoentes
+	for (int i = 0; i < size; i++){
+		exp_sum += exp(input[i]-logits_max); // Subtrai pelo maior numero para evitar overflow, mas ainda mantem a matematica correta
+	}
+	// Obtem o resultado do expoente de cada numero da lista dividido pela soma de todos os expoentes
+	for (int i = 0; i < size; i++){
+		input[i] = exp(input[i]-logits_max)/exp_sum;
+	}
 }
 
 // Escolhe o maior valor
@@ -53,6 +76,8 @@ double *forward(ForwardMemory *forward_memory, const double *neuron_input){
 	const double * restrict weights = forward_memory->weights;
 	const double * restrict biases = forward_memory->biases;
 	bool ReLU_enabled = forward_memory->ReLU_enabled;
+	bool tanh_output_enabled = forward_memory->tanh_output_enabled;
+	bool softmax_output_enabled = forward_memory->softmax_output_enabled;
 	bool make_biases = false;
 	
 	// Copia os valores iniciais recebidos para a memoria reutilizada
@@ -117,6 +142,18 @@ double *forward(ForwardMemory *forward_memory, const double *neuron_input){
 		layer_output = temp;
 		
 	}
+
+	// Aplica tanh na saida se ativado
+	if (tanh_output_enabled){
+		for (int i = 0; i < model[model_length-1]; i++){
+			layer_input[i] = tanh(layer_input[i]);
+		}
+	}
+
+	// Aplica softmax na saida se ativado
+	if (softmax_output_enabled){
+		softmax(layer_input, model[model_length-1]);
+	}
 	
 	// Retorna o endereco da ultima camada
 	return layer_input;
@@ -126,14 +163,14 @@ double *forward(ForwardMemory *forward_memory, const double *neuron_input){
 double *forward_with_cache(ForwardMemory *forward_memory, const double *neuron_input){
 	// Obtem os enderecos de forward_memory
 	// restrict, afirma que os nao ha sobreposicao de enderecos, permitindo vetorizacao apos a compilacao
-	double * restrict layer_input = forward_memory->layer_input;
-	double * restrict layer_output = forward_memory->layer_output;
 	int * restrict model = forward_memory->model;
 	int model_length = forward_memory->model_length;
 	int biases_length = forward_memory-> biases_length;
 	const double * restrict weights = forward_memory->weights;
 	const double * restrict biases = forward_memory->biases;
 	bool ReLU_enabled = forward_memory->ReLU_enabled;
+	bool tanh_output_enabled = forward_memory->tanh_output_enabled;
+	bool softmax_output_enabled = forward_memory->softmax_output_enabled;
 	bool make_biases = false;
 
 	// Obtem o tamanho do cache, quantidade de neuronios total; quantidade de biases mais a quantidade de neuronios na segunda camada
@@ -200,6 +237,18 @@ double *forward_with_cache(ForwardMemory *forward_memory, const double *neuron_i
 		cache_i += current_layer;
 		
 	}
+
+	// Aplica tanh na saida se ativado
+	if (tanh_output_enabled){
+		for (int i = neuron_cache_length-model[model_length-1]; i < neuron_cache_length; i++){
+			neuron_cache[i] = tanh(neuron_cache[i]);
+		}
+	}
+
+	// Aplica softmax na saida se ativado
+	if (softmax_output_enabled){
+		softmax(neuron_cache+neuron_cache_length-model[model_length-1], model[model_length-1]);
+	}
 	
 	// Retorna o endereco da ultima camada
 	return neuron_cache;
@@ -233,6 +282,11 @@ bool backward(ForwardMemory *forward_memory, const double *desired, const double
 	// Obtem o tamanho do cache, quantidade de neuronios total; quantidade de biases mais a quantidade de neuronios na segunda camada
 	int neuron_cache_length = biases_length+model[0];
 	
+	//printf("Neuron: ");
+	for (int i = 0; i < neuron_cache_length; i++){
+		//printf("%f, ", neuron_cache[i]);
+	}
+	//printf("\n");
 
 
 	// Aloca memoria suficiente pada armazenar os gradientes de todos os neuronios e pesos
@@ -275,7 +329,7 @@ bool backward(ForwardMemory *forward_memory, const double *desired, const double
 				] -
 				desired[next_layer_neuron_i]);
 			}
-
+			
 			// Percorre todos os neuronios da camada atual
 			for (int current_layer_neuron_i = 0; current_layer_neuron_i < current_layer; current_layer_neuron_i++){
 				// Obtendo os gradientes dos neuronios //
@@ -312,6 +366,7 @@ bool backward(ForwardMemory *forward_memory, const double *desired, const double
 						front_weights
 					]
 				);
+				
 			}
 		}
 
@@ -359,8 +414,10 @@ bool backward(ForwardMemory *forward_memory, const double *desired, const double
 		front_weights += current_layer*next_layer;
 	}
 
+	//printf("Gradients W: ");
 	// Aplica os gradientes aos pesos usando o learning rate
 	for (int i = 0; i < weights_length; i++){
+		//printf("%f, ", weights_gradients[i]);
 		weights[i] -= learning_rate * weights_gradients[i];
 	}
 
