@@ -31,7 +31,10 @@ typedef struct {
 	// Layers usados durante o calculos
 	double *layer_input; // Entrada (valores iniciais)
 	double *layer_output; // Saida (valores finais)
-	bool ReLU_enabled;
+	bool ReLU_enabled; // Aplica ReLU nas camadas internas
+	// Funcoes de ativacoes na saida
+	bool tanh_output_enabled;
+	bool softmax_output_enabled;
 	double learning_rate; // Taxa de aprendizagem durante o backward
 } ForwardMemory;
 
@@ -39,7 +42,7 @@ typedef struct {
 // Funcoes de ativacao e suas derivadas
 double ReLU(double value);
 double ReLU_derivative(double value);
-
+void softmax(double *input, size_t size);
 
 // Escolhe o maior valor
 double max(double a, double b);
