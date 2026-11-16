@@ -21,6 +21,20 @@ double ReLU(double value){
 double ReLU_derivative(double value){
 	return value > 0 ? 1 : 0;
 }
+// AF Sigmoid
+double sigmoid(double value){
+	return 1.0 / (1.0 + exp(-value));
+}
+// Derivada da AF Sigmoid
+double sigmoid_derivative(double value){
+	double sigmoid_outpout = sigmoid(value);
+	return sigmoid_outpout * (1 - sigmoid_outpout);
+}
+
+// Derivada da AF Sigmoid apartir da sigmoid de um valor
+double _sigmoid_derivative_after_sigmoid(double value){
+	return value * (1 - value);
+}
 // AF Softmax
 void softmax(double *input, size_t size){
 	// Soma de todos os expoentes
@@ -76,6 +90,7 @@ double *forward(ForwardMemory *forward_memory, const double *neuron_input){
 	const double * restrict weights = forward_memory->weights;
 	const double * restrict biases = forward_memory->biases;
 	bool ReLU_enabled = forward_memory->ReLU_enabled;
+	bool sigmoid_enabled = forward_memory->sigmoid_enabled;
 	bool tanh_output_enabled = forward_memory->tanh_output_enabled;
 	bool softmax_output_enabled = forward_memory->softmax_output_enabled;
 	bool make_biases = false;
@@ -125,6 +140,11 @@ double *forward(ForwardMemory *forward_memory, const double *neuron_input){
 				// Zera o valor do neuronio se for menor que 0
 				sum = ReLU(sum);
 			}
+			// Se sigmoid estiver ativado e nao for a ultima camada
+			if (sigmoid_enabled && isnt_last_layer){
+				// Zera o valor do neuronio se for menor que 0
+				sum = sigmoid(sum);
+			}
 			
 			// Por o resultado da soma no respectivo neuronio da layer seguinte, acrescentando o bias do endereco atual da lista de biases
 			layer_output[neuron_i] = sum;
@@ -169,6 +189,7 @@ double *forward_with_cache(ForwardMemory *forward_memory, const double *neuron_i
 	const double * restrict weights = forward_memory->weights;
 	const double * restrict biases = forward_memory->biases;
 	bool ReLU_enabled = forward_memory->ReLU_enabled;
+	bool sigmoid_enabled = forward_memory->sigmoid_enabled;
 	bool tanh_output_enabled = forward_memory->tanh_output_enabled;
 	bool softmax_output_enabled = forward_memory->softmax_output_enabled;
 	bool make_biases = false;
@@ -226,6 +247,11 @@ double *forward_with_cache(ForwardMemory *forward_memory, const double *neuron_i
 				// Zera o valor do neuronio se for menor que 0
 				sum = ReLU(sum);
 			}
+			// Se sigmoid estiver ativado e nao for a ultima camada
+			if (sigmoid_enabled && isnt_last_layer){
+				// Zera o valor do neuronio se for menor que 0
+				sum = sigmoid(sum);
+			}
 			
 			// Por o resultado da soma no respectivo neuronio da layer seguinte, acrescentando o bias do endereco atual da lista de biases
 			neuron_cache[neuron_i+cache_i+current_layer] = sum;
@@ -267,6 +293,7 @@ bool backward(ForwardMemory *forward_memory, const double *desired, const double
 	double * restrict weights = forward_memory->weights;
 	double * restrict biases = forward_memory->biases;
 	bool ReLU_enabled = forward_memory->ReLU_enabled;
+	bool sigmoid_enabled = forward_memory->sigmoid_enabled;
 	bool make_biases = false;
 	double learning_rate = forward_memory->learning_rate;
 
@@ -354,6 +381,13 @@ bool backward(ForwardMemory *forward_memory, const double *desired, const double
 						next_layer +
 						next_layer_neuron_i -
 						front_neurons
+					]) : 1) * // equivalente: if (sigmoid_enabled){_sigmoid_derivative_after_sigmoid(...)} else {1}
+					(sigmoid_enabled ? _sigmoid_derivative_after_sigmoid(
+						neuron_cache[
+						neuron_cache_length -
+						next_layer +
+						next_layer_neuron_i -
+						front_neurons
 					]) : 1) *
 					weights // Obtendo o peso
 					[
@@ -398,8 +432,14 @@ bool backward(ForwardMemory *forward_memory, const double *desired, const double
 						next_layer +
 						next_layer_neuron_i -
 						front_neurons
-					]) : 1
-				) * neuron_cache[
+					]) : 1) * // equivalente: if (sigmoid_enabled){_sigmoid_derivative_after_sigmoid(...)} else {1}
+					(sigmoid_enabled ? _sigmoid_derivative_after_sigmoid(
+						neuron_cache[
+						neuron_cache_length -
+						next_layer +
+						next_layer_neuron_i -
+						front_neurons
+					]) : 1) * neuron_cache[
 					neuron_cache_length -
 					current_layer -
 					next_layer +
