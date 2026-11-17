@@ -30,7 +30,6 @@ double sigmoid_derivative(double value){
 	double sigmoid_outpout = sigmoid(value);
 	return sigmoid_outpout * (1 - sigmoid_outpout);
 }
-
 // Derivada da AF Sigmoid apartir da sigmoid de um valor
 double _sigmoid_derivative_after_sigmoid(double value){
 	return value * (1 - value);
@@ -57,6 +56,7 @@ void softmax(double *input, size_t size){
 	}
 }
 
+
 // Escolhe o maior valor
 double max(double a, double b){
 	return a > b ? a : b;
@@ -66,15 +66,14 @@ double min(double a, double b){
 	return a < b ? a : b;
 }
 
-// Calcula a loss (erro) do modelo
+// Calcula a loss (erro) do modelo, usando Cross-Entropy
 double compute_loss(ForwardMemory *forward_memory, const double *response, const double *desired){
 	int response_length = forward_memory->model[ forward_memory->model_length - 1 ];
+	double epsilon = 1e-15; // Valor minimo para evitar log(0)
 	double loss = 0;
 	for (int i = 0; i < response_length; i++){
-		double difference = response[i] - desired[i];
-		loss += difference * difference;
+		loss -= desired[i] * log(fmax(response[i], epsilon));
 	}
-	loss = loss / response_length;
 	return loss;
 }
 
@@ -341,26 +340,26 @@ bool backward(ForwardMemory *forward_memory, const double *desired, const double
 		for (int next_layer_neuron_i = 0; next_layer_neuron_i < next_layer; next_layer_neuron_i++){
 			// Se for a ultima camada
 			if (!isnt_last_layer){
-				// Calcula os gradientes dos neuronios da ultima camada; 2(A - Y)
+				// Calcula os gradientes dos neuronios da ultima camada; derivada do Cross-Entropy dL/dZ; (A - Y)
 				neuron_gradients[
 					neuron_cache_length -
 					next_layer +
 					next_layer_neuron_i -
 					front_neurons
-				] = 2 * (
-				neuron_cache[
+				] = neuron_cache[
 					neuron_cache_length -
 					next_layer +
 					next_layer_neuron_i -
 					front_neurons
 				] -
-				desired[next_layer_neuron_i]);
+				desired[next_layer_neuron_i];
+				
 			}
 			
 			// Percorre todos os neuronios da camada atual
 			for (int current_layer_neuron_i = 0; current_layer_neuron_i < current_layer; current_layer_neuron_i++){
 				// Obtendo os gradientes dos neuronios //
-				// Soma as derivadas L/A[L]i * A[L]i/A[L-1]i formando a derivada L/A[L-1]i no final do loop 
+				// Soma as derivadas L/A[L]i * A[L]i/A[L-1]i formando a derivada L/A[L-1]i no final do loop
 				neuron_gradients
 				// Quebrando as expressoes em linha
 				[
@@ -586,7 +585,7 @@ bool weights_mutate(ForwardMemory *forward_memory){
 	for (int i = 0; i < weights_length; i++){
 		// Gera um numeto aleatorio dentro de -max_weight a max_weight
 		weights[i] += (double)rand() / RAND_MAX * max_weight_mutation * 2 - max_weight_mutation;
-		weights[i] = max(min(weights[i], max_weight), -max_weight);
+		weights[i] = fmax(fmin(weights[i], max_weight), -max_weight);
 	}
 
 	return 0;
@@ -605,7 +604,7 @@ bool biases_mutate(ForwardMemory *forward_memory) {
 	for (int i = 0; i < biases_length; i++){
 		// Gera um numeto aleatorio dentro de -max_biases a max_biases
 		biases[i] += (double)rand() / RAND_MAX * max_bias_mutation * 2 - max_bias_mutation;
-		biases[i] = max(min(biases[i], max_bias), -max_bias);
+		biases[i] = fmax(fmin(biases[i], max_bias), -max_bias);
 	}
 
 	return 0;
