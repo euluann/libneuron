@@ -279,7 +279,7 @@ double *forward_with_cache(ForwardMemory *forward_memory, const double *neuron_i
 	return neuron_cache;
 }
 
-// Calcula os gradientes de todos os pesos e bias, e modifica os pesos apartir dos gradientes
+// Calcula os gradientes de todos os pesos e bias, e os soma aos gradientes ja existentes, acumulando gradientes
 // Um gradiente eh a influencia que determinada variavel tem na Loss (erro)
 bool backward(ForwardMemory *forward_memory, const double *desired, const double *neuron_input){
 
@@ -317,7 +317,8 @@ bool backward(ForwardMemory *forward_memory, const double *desired, const double
 
 	// Aloca memoria suficiente pada armazenar os gradientes de todos os neuronios e pesos
 	double *neuron_gradients = calloc(neuron_cache_length, sizeof(double));
-	double *weights_gradients = calloc(forward_memory->weights_length, sizeof(double));
+	double *weights_gradients = forward_memory->weights_gradients;
+	double *biases_gradients = forward_memory->biases_gradients;
 
 
 	// Camadas a frente; camadas ja percorridas no backpropagation que devem ser consideradas para acessar os valores corretos
@@ -418,7 +419,7 @@ bool backward(ForwardMemory *forward_memory, const double *desired, const double
 					next_layer_neuron_i * 
 					current_layer -
 					front_weights
-				] = neuron_gradients
+				] += neuron_gradients
 				[
 					neuron_cache_length -
 					next_layer +
@@ -453,27 +454,55 @@ bool backward(ForwardMemory *forward_memory, const double *desired, const double
 		front_weights += current_layer*next_layer;
 	}
 
-	//printf("Gradients W: ");
-	// Aplica os gradientes aos pesos usando o learning rate
-	for (int i = 0; i < weights_length; i++){
-		//printf("%f, ", weights_gradients[i]);
-		weights[i] -= learning_rate * weights_gradients[i];
-	}
-
-	// Aplica os gradientes dos neuronios aos bias usando o learning rate
+	// Calcula os gradientes dos biases
 	for (int i = 0; i < biases_length; i++){
 		// Multiplica a derivada da AF
-		biases[i] -= learning_rate * neuron_gradients[i+model[0]] * ( // equivalente: if (ReLU_enabled){ReLU_derivative(...)} else {1}
+		biases_gradients[i] += neuron_gradients[i+model[0]] * ( // equivalente: if (ReLU_enabled){ReLU_derivative(...)} else {1}
 		ReLU_enabled ? ReLU_derivative(
+			neuron_cache[i+model[0]]) :
+			1
+		 *
+		sigmoid_enabled ? _sigmoid_derivative_after_sigmoid(
 			neuron_cache[i+model[0]]) :
 			1
 		);
 	}
+
+	
 	
 	// Libera a memoria utilizada
 	free(neuron_cache);
 	free(neuron_gradients);
-	free(weights_gradients);
+	return 0;
+}
+
+// Aplica os gradientes calculados e acumulados com o uso sequencial do backward()
+bool apply_gradients(ForwardMemory *forward_memory){
+	// Obtem os enderecos de forward_memory
+	// restrict, afirma que os nao ha sobreposicao de enderecos, permitindo vetorizacao apos a compilacao
+	int biases_length = forward_memory-> biases_length;
+	int weights_length = forward_memory->weights_length;
+	double * restrict weights = forward_memory->weights;
+	double * restrict biases = forward_memory->biases;
+	double learning_rate = forward_memory->learning_rate;
+
+	double *weights_gradients = forward_memory->weights_gradients;
+	double *biases_gradients = forward_memory->biases_gradients;
+
+	// Aplica os gradientes aos pesos usando o learning rate
+	for (int i = 0; i < weights_length; i++){
+		//printf("%f, ", weights_gradients[i]);
+		weights[i] -= learning_rate * weights_gradients[i];
+		// Zera o gradiente ja aplicado
+		weights_gradients[i] = 0;
+	}
+	// Aplica os gradientes dos biases usando o learning rate
+	for (int i = 0; i < biases_length; i++){
+		// Multiplica a derivada da AF
+		biases[i] -= learning_rate * biases_gradients[i];
+		// Zera o gradiente ja aplicado
+		biases_gradients[i] = 0;
+	}
 	return 0;
 }
 
@@ -688,6 +717,12 @@ bool initialize_forward_memory(ForwardMemory *forward_memory){
 	
 	// Aloca memoria suficiente para todos os biases que o modelo usara
 	forward_memory->biases = malloc(forward_memory->biases_length * sizeof(double));
+
+	// Aloca memoria suficiente para os gradientes de todos os pesos que o modelo usara
+	forward_memory->weights_gradients = calloc(forward_memory->weights_length, sizeof(double));
+	
+	// Aloca memoria suficiente para os gradientes de todos os biases que o modelo usara
+	forward_memory->biases_gradients = calloc(forward_memory->biases_length, sizeof(double));
 	
 	// Aloca memoria suficiente para a maior layer
 	forward_memory->layer_input = malloc(forward_memory->memory_size * sizeof(double));
