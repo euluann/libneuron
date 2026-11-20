@@ -8,9 +8,30 @@
 #include <stdlib.h>
 #include <stddef.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <string.h>
 #include <time.h>
 #include <math.h>
+
+
+// Funcao para ler 32 bits (4 bytes) de um arquivo escrito em Big Endian em uma maquina Little Endian
+uint32_t read_u32(FILE *file){
+	// Onde ficara os 4 bytes
+	uint8_t bytes[4];
+	
+	// Le o arquivo e verifica se os 4 bytes foram lidos corretamente
+	if (fread(bytes, 1, 4, file) != 4){
+		return 0;
+	}
+
+	// Retorna o numero em Big Endian lido em Little Endian e convertido para seu equivalente em Little Endian
+	return (
+		bytes[0] << 24 | // Move o byte 0 (ultimo byte que ficou no inicio) para a posicao 3 (final do numero de 32 bits; 4 bytes) com Left Shift (move o byte 24 bits pra esquerda)
+		bytes[1] << 16 | // Move o byte 1 para posicao 2
+		bytes[2] << 8 | // Move o byte 2 para a posicao 1
+		bytes[3] // Byte 3 ja na posicao 0
+	);
+}
 
 
 // Funcao de ativacao (AF) ReLU
@@ -468,7 +489,9 @@ bool backward(ForwardMemory *forward_memory, const double *desired, const double
 		);
 	}
 
-	
+	// Aumenta seus divisores para obter a media correta durante aplicacao dos gradientes
+	forward_memory->weights_gradients_divider++;
+	forward_memory->biases_gradients_divider++;
 	
 	// Libera a memoria utilizada
 	free(neuron_cache);
@@ -485,24 +508,37 @@ bool apply_gradients(ForwardMemory *forward_memory){
 	double * restrict weights = forward_memory->weights;
 	double * restrict biases = forward_memory->biases;
 	double learning_rate = forward_memory->learning_rate;
+	int weights_gradients_divider = forward_memory->weights_gradients_divider;
+	int biases_gradients_divider = forward_memory->biases_gradients_divider;
 
 	double *weights_gradients = forward_memory->weights_gradients;
 	double *biases_gradients = forward_memory->biases_gradients;
 
+	//printf("  %d  %d  ", weights_gradients_divider, biases_gradients_divider);
+
+	// Define o minimo dos divisores como 1 temporariamente para evitar divisao por 0
+	weights_gradients_divider = fmax(weights_gradients_divider, 1);
+	biases_gradients_divider = fmax(biases_gradients_divider, 1);
+
 	// Aplica os gradientes aos pesos usando o learning rate
 	for (int i = 0; i < weights_length; i++){
-		//printf("%f, ", weights_gradients[i]);
-		weights[i] -= learning_rate * weights_gradients[i];
+		// Multiplica o learning rate pela media do gradiente e subtrai nos pesos
+		weights[i] -= learning_rate * (weights_gradients[i] / weights_gradients_divider);
 		// Zera o gradiente ja aplicado
 		weights_gradients[i] = 0;
 	}
 	// Aplica os gradientes dos biases usando o learning rate
 	for (int i = 0; i < biases_length; i++){
-		// Multiplica a derivada da AF
-		biases[i] -= learning_rate * biases_gradients[i];
+		// Multiplica o learning rate pela media do gradiente e subtrai nos biases
+		biases[i] -= learning_rate * (biases_gradients[i] / biases_gradients_divider);
 		// Zera o gradiente ja aplicado
 		biases_gradients[i] = 0;
 	}
+
+	// Retorna os divisores ao 0
+	forward_memory->biases_gradients_divider = 0;
+	forward_memory->weights_gradients_divider = 0;
+
 	return 0;
 }
 
@@ -665,6 +701,10 @@ bool initialize_forward_memory(ForwardMemory *forward_memory){
 	if (forward_memory->biases != NULL){
 		free(forward_memory->biases);
 	}
+
+	// Define os divisores dos gradientes como 0, para definir um ponto de partida (se ainda 0 durante a aplicacao dos gradientes, eh usado 1)
+	forward_memory->biases_gradients_divider = 0;
+	forward_memory->weights_gradients_divider = 0;
 	
 	// Inicializa os tamanhos que serao contados como 0
 	forward_memory->memory_size = 0;
