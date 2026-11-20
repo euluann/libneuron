@@ -22,11 +22,13 @@ typedef struct {
 	double max_weight; // Peso maximo, se for 5, o peso podera variar de -5 a 5
 	double max_weight_mutation; // Mutacao maxima do peso, se for 2, a mutacao aplicada no peso podera variar de -2 a 2
 	double *weights; // Endereco para a array de pesos
+	double *weights_gradients; // Endereco para a array dos gradiente dos pesos
 
 	size_t biases_length; // Quantidade de biases
 	double max_bias; // Bias maximo, se for 5, o bias podera variar de -5 a 5
 	double max_bias_mutation; // Mutacao maxima do bias, se for 2, a mutacao aplicada no bias podera variar de -2 a 2
 	double *biases; // Endereco para a array de biases
+	double *biases_gradients; // Endereco para a array dos gradiente dos biases
 
 	// Layers usados durante o calculos
 	double *layer_input; // Entrada (valores iniciais)
@@ -52,7 +54,7 @@ double max(double a, double b);
 // Escolhe o menor valor
 double min(double a, double b);
 
-// Calcula a loss (erro) do modelo
+// Calcula a loss (erro) do modelo, usando o Cross-Entropy
 double compute_loss(ForwardMemory *forward_memory, const double *response, const double *desired);
 
 // Inferencia //
@@ -62,7 +64,12 @@ double *forward(ForwardMemory *forward_memory, const double *neuron_input);
 // Funcao que calcula a saida do algoritmo Forward para Inteligencias Artificiais, porem armazenando e retornando os valores de cada neuronio
 double *forward_with_cache(ForwardMemory *forward_memory, const double *neuron_input);
 
+// Calcula os gradientes de todos os pesos e bias, e os soma aos gradientes ja existentes, acumulando gradientes
+// Um gradiente eh a influencia que determinada variavel tem na Loss (erro)
 bool backward(ForwardMemory *forward_memory, const double *desired, const double *neuron_input);
+
+// Aplica os gradientes calculados e acumulados com o uso sequencial do backward()
+bool apply_gradients(ForwardMemory *forward_memory);
 
 // Persistencia //
 // Funcao para salvar os pesos em um arquivo binario
