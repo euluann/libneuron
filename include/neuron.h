@@ -7,6 +7,11 @@
 
 #include <stddef.h>
 #include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
+
+// Funcao para ler 32 bits (4 bytes) de um arquivo escrito em Big Endian em uma maquina Little Endian
+uint32_t read_u32(FILE *file);
 
 
 // Estrutura onde ficara as memorias que o algoritmo reutilizara
@@ -23,12 +28,14 @@ typedef struct {
 	double max_weight_mutation; // Mutacao maxima do peso, se for 2, a mutacao aplicada no peso podera variar de -2 a 2
 	double *weights; // Endereco para a array de pesos
 	double *weights_gradients; // Endereco para a array dos gradiente dos pesos
+	int weights_gradients_divider; // Numero pelo qual os gradientes dos pesos seram divididos, serve para tirar a media da soma de varios gradientes
 
 	size_t biases_length; // Quantidade de biases
 	double max_bias; // Bias maximo, se for 5, o bias podera variar de -5 a 5
 	double max_bias_mutation; // Mutacao maxima do bias, se for 2, a mutacao aplicada no bias podera variar de -2 a 2
 	double *biases; // Endereco para a array de biases
 	double *biases_gradients; // Endereco para a array dos gradiente dos biases
+	int biases_gradients_divider; // Numero pelo qual os gradientes dos biases seram divididos, serve para tirar a media da soma de varios gradientes
 
 	// Layers usados durante o calculos
 	double *layer_input; // Entrada (valores iniciais)
